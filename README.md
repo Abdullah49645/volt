@@ -4,7 +4,7 @@ AWS Agents for Humans Hackathon 2026
 
 **Live interactive demo:** *(add your Vercel URL here once deployed)* — also
 available as a standalone repo at
-[github.com/`<your-username>`/volt-demo](https://github.com/) if you just
+https://github.com/Abdullah49645/volt-demo if you just
 want the UI without the full backend.
 
 > You don't tell VOLT when to charge your car or run your appliances. You tell it what needs to be true — and VOLT continuously figures out how to make it true.
