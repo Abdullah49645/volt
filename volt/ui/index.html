@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOLT — Household Control Center</title>
+<style>
+  :root{
+    --bg:#0d1210; --panel:#141b18; --panel-2:#1a2320; --line:#26322d;
+    --text:#e9efe9; --sub:#8fa398; --dim:#5f7268;
+    --amber:#e0a95e; --amber-dim:#8a6a3a;
+    --cyan:#5eb8c4;
+    --ok:#5fae7a; --warn:#d9a441; --bad:#c4645a;
+    --mono:'IBM Plex Mono','SF Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans','Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;}
+  .brand{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:0.5px;color:var(--text);}
+  .brand span{color:var(--amber);}
+  .status-pill{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12.5px;color:var(--sub);}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);}
+  .dot.thinking{background:var(--amber);box-shadow:0 0 6px var(--amber);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  .grid{display:grid;grid-template-columns:1.15fr 0.85fr;gap:16px;}
+  @media(max-width:880px){.grid{grid-template-columns:1fr;}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px 20px;margin-bottom:16px;}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin:0 0 14px;font-weight:600;}
+
+  .status-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .stat{border-left:2px solid var(--line);padding-left:12px;}
+  .stat.tracking{border-left-color:var(--ok);}
+  .stat.risk{border-left-color:var(--warn);}
+  .stat-label{font-size:11.5px;color:var(--sub);margin-bottom:4px;}
+  .stat-value{font-family:var(--mono);font-size:20px;font-weight:600;}
+  .stat-sub{font-size:11.5px;color:var(--dim);margin-top:3px;}
+  .badge{display:inline-block;font-size:10.5px;font-family:var(--mono);padding:1px 6px;border-radius:3px;margin-left:6px;}
+  .badge.ok{background:rgba(95,174,122,.15);color:var(--ok);}
+  .badge.warn{background:rgba(217,164,65,.15);color:var(--warn);}
+
+  /* energy flow */
+  .flow{display:flex;align-items:center;justify-content:space-between;padding:18px 4px 6px;}
+  .node{text-align:center;flex:1;}
+  .node-icon{width:52px;height:52px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-family:var(--mono);font-size:13px;color:var(--cyan);background:var(--panel-2);position:relative;}
+  .node-icon.active{border-color:var(--amber);color:var(--amber);}
+  .node-label{font-size:11px;color:var(--sub);}
+  .node-value{font-family:var(--mono);font-size:13px;color:var(--text);margin-top:2px;}
+  .arrow{flex:0 0 46px;height:2px;background:var(--line);position:relative;margin-top:-30px;}
+  .arrow.on{background:var(--amber-dim);}
+  .arrow.on::after{content:'';position:absolute;right:-1px;top:-3px;width:0;height:0;border-left:5px solid var(--amber-dim);border-top:4px solid transparent;border-bottom:4px solid transparent;}
+
+  .strategy-item{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .strategy-item:last-child{border-bottom:none;}
+  .strategy-item .k{color:var(--sub);}
+  .strategy-item .v{font-family:var(--mono);color:var(--text);}
+
+  .timeline{position:relative;padding-left:18px;}
+  .tl-item{position:relative;padding:0 0 16px 14px;border-left:1.5px solid var(--line);}
+  .tl-item:last-child{border-left-color:transparent;padding-bottom:0;}
+  .tl-item::before{content:'';position:absolute;left:-4.5px;top:2px;width:8px;height:8px;border-radius:50%;background:var(--dim);}
+  .tl-item.now::before{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+  .tl-time{font-family:var(--mono);font-size:11.5px;color:var(--dim);}
+  .tl-text{font-size:13px;color:var(--text);margin-top:2px;}
+
+  .activity{max-height:280px;overflow-y:auto;}
+  .act-item{display:flex;gap:10px;padding:7px 0;font-size:12.5px;border-bottom:1px solid var(--line);}
+  .act-item:last-child{border-bottom:none;}
+  .act-time{font-family:var(--mono);color:var(--dim);flex:0 0 46px;}
+  .act-text{color:var(--sub);}
+  .act-text b{color:var(--text);font-weight:500;}
+  .act-item.ok .act-text{color:var(--ok);}
+  .act-item.warn .act-text{color:var(--warn);}
+  .act-item.event .act-text{color:var(--cyan);}
+
+  .needs-you{border:1px solid var(--warn);background:rgba(217,164,65,.06);}
+  .needs-you h2{color:var(--warn);}
+  .needs-you p{font-size:13.5px;line-height:1.5;color:var(--text);margin:0 0 14px;}
+  .btn-row{display:flex;gap:10px;}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:9px 14px;border-radius:5px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);cursor:pointer;}
+  .btn:hover{border-color:var(--amber-dim);}
+  .btn.primary{background:var(--amber);color:#1a1400;border-color:var(--amber);}
+  .btn.primary:hover{background:#eab971;}
+
+  .sim-controls{display:flex;flex-wrap:wrap;gap:8px;}
+  .sim-btn{font-family:var(--mono);font-size:11.5px;padding:7px 10px;border-radius:4px;border:1px solid var(--line);background:var(--panel-2);color:var(--sub);cursor:pointer;}
+  .sim-btn:hover{color:var(--text);border-color:var(--cyan);}
+  .sim-time{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-bottom:10px;}
+
+  .simulated-tag{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:0.6px;}
+
+  .replan{border:1px solid var(--cyan);background:rgba(94,184,196,.06);}
+  .replan h2{color:var(--cyan);}
+  .replan-flow{display:flex;align-items:stretch;gap:10px;}
+  @media(max-width:640px){.replan-flow{flex-direction:column;}}
+  .replan-col{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:12px;}
+  .replan-col.new{border-color:var(--cyan);}
+  .replan-col-label{font-size:10.5px;letter-spacing:0.6px;color:var(--dim);margin-bottom:8px;font-family:var(--mono);}
+  .replan-col.new .replan-col-label{color:var(--cyan);}
+  .replan-row{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;}
+  .replan-row .k{color:var(--sub);}
+  .replan-row .v{font-family:var(--mono);color:var(--text);}
+  .replan-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 30px;color:var(--dim);font-family:var(--mono);font-size:16px;}
+  .replan-cause{font-size:12.5px;color:var(--warn);margin-bottom:10px;}
+  .replan-outcome{margin-top:10px;font-size:12.5px;color:var(--ok);font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">VOLT</div>
+    <div class="status-pill"><span class="dot" id="agentDot"></span><span id="agentStatus">AUTONOMOUS</span></div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT COLUMN -->
+    <div>
+      <div class="card">
+        <h2>Household status</h2>
+        <div class="status-row" id="statusRow"></div>
+      </div>
+
+      <div class="card">
+        <h2>Energy flow <span class="simulated-tag">— household simulator, simulated</span></h2>
+        <div class="flow" id="flowRow"></div>
+      </div>
+
+      <div class="card replan" id="replanCard" style="display:none;">
+        <h2>Plan replacement</h2>
+        <div class="replan-cause" id="replanCause"></div>
+        <div class="replan-flow">
+          <div class="replan-col"><div class="replan-col-label">PREVIOUS PLAN</div><div id="replanPrev"></div></div>
+          <div class="replan-mid">→</div>
+          <div class="replan-col new"><div class="replan-col-label">NEW PLAN</div><div id="replanNew"></div></div>
+        </div>
+        <div class="replan-outcome" id="replanOutcome"></div>
+      </div>
+
+      <div class="card">
+        <h2>Current strategy</h2>
+        <div id="strategyList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Plan timeline</h2>
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <div class="card" id="needsYouCard" style="display:none;">
+        <div class="needs-you">
+        <h2 style="margin-top:0">Needs you</h2>
+        <p id="needsYouText"></p>
+        <div class="btn-row">
+          <button class="btn primary" onclick="resolveEscalation(true)">Allow backup option</button>
+          <button class="btn" onclick="resolveEscalation(false)">Keep current plan</button>
+        </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>VOLT activity</h2>
+        <div class="activity" id="activityLog"></div>
+      </div>
+
+      <div class="card">
+        <h2>Simulation controls <span class="simulated-tag">— demo only</span></h2>
+        <div class="sim-time" id="simTime"></div>
+        <div class="sim-controls">
+          <button class="sim-btn" onclick="advance(15)">+15 min</button>
+          <button class="sim-btn" onclick="advance(60)">+1 hour</button>
+          <button class="sim-btn" onclick="eventPriceSpike()">Price spike</button>
+          <button class="sim-btn" onclick="eventSolarDrop()">Solar forecast drops</button>
+          <button class="sim-btn" onclick="eventDeadlineChange()">Deadline moves up</button>
+          <button class="sim-btn" onclick="eventDeviceFailure()">EV charger failure</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------
+   Embedded household simulator + optimizer + agent loop, mirroring
+   the Python reference implementation (simulator/environment.py,
+   optimizer/engine.py, agent/orchestrator.py) so this control center
+   is a live, interactive demo runnable in the browser.
+--------------------------------------------------------------------- */
+const PRICE_SCHEDULE = {0:.14,1:.12,2:.11,3:.11,4:.13,5:.16,6:.20,7:.24,8:.22,9:.20,10:.18,11:.17,12:.16,13:.15,14:.16,15:.18,16:.22,17:.30,18:.34,19:.32,20:.28,21:.24,22:.20,23:.16};
+
+let state = {
+  simStart: new Date('2026-09-09T16:00:00'),
+  minutesElapsed: 0,
+  battery: {soc:64, reserve:30, capacity:13.5, maxCharge:5, maxDischarge:5},
+  ev: {soc:32, target:80, capacity:75, maxCharge:11, deadlineMin: 15*60, chargerOnline:true},
+  solar: {capacity:6, cloudFactor:1.0},
+  priceSchedule: {...PRICE_SCHEDULE},
+  plan: null,
+  activity: [],
+  escalation: null,
+  replanEvent: null,
+};
+
+function now(){ return new Date(state.simStart.getTime() + state.minutesElapsed*60000); }
+function minuteOfDay(t){ return t.getHours()*60 + t.getMinutes(); }
+function solarAt(mod, cloudFactor){
+  const hour = (mod/60)%24;
+  if(hour<6||hour>20) return 0;
+  return Math.max(0, Math.sin(Math.PI*(hour-6)/14)) * state.solar.capacity * cloudFactor;
+}
+function priceAt(mod){ return state.priceSchedule[Math.floor((mod/60)%24)] ?? 0.25; }
+
+function log(text, tag){
+  state.activity.unshift({t: now(), text, tag: tag||'info'});
+  state.activity = state.activity.slice(0,40);
+}
+
+function runOptimizer(){
+  const horizon = 900, step = 15;
+  const minutesToDeadline = Math.max(0, state.ev.deadlineMin - state.minutesElapsed);
+  const energyNeeded = Math.max(0,(state.ev.target-state.ev.soc)/100*state.ev.capacity);
+  const maxDeliverable = (minutesToDeadline/60)*state.ev.maxCharge;
+  const violations = [];
+  if(!state.ev.chargerOnline) violations.push('EV charger offline — cannot deliver scheduled energy.');
+  else if(energyNeeded > maxDeliverable+1e-6) violations.push(`EV target infeasible: needs ${energyNeeded.toFixed(1)} kWh in ${minutesToDeadline} min, max deliverable ${maxDeliverable.toFixed(1)} kWh.`);
+
+  const feasible = violations.length===0;
+  let cost = 0, evKwSlots=[];
+  if(feasible){
+    const nSlots = Math.max(1, Math.floor(minutesToDeadline/step));
+    const forecast = [];
+    for(let m=0;m<Math.min(horizon,minutesToDeadline);m+=step){
+      const mod = (minuteOfDay(now())+m)%1440;
+      forecast.push({m, price:priceAt(mod), solar:solarAt(mod,state.solar.cloudFactor)});
+    }
+    const ranked = [...forecast].sort((a,b)=>(a.price-0.02*a.solar)-(b.price-0.02*b.solar));
+    let remaining = energyNeeded;
+    const chosen = new Set();
+    for(const slot of ranked){
+      if(remaining<=1e-6) break;
+      const kwh = Math.min(state.ev.maxCharge*(step/60), remaining);
+      remaining -= kwh;
+      chosen.add(slot.m);
+      evKwSlots.push({minute:slot.m, kw: kwh/(step/60)});
+    }
+    for(const f of forecast){
+      const evKw = chosen.has(f.m) ? evKwSlots.find(s=>s.minute===f.m).kw : 0;
+      const net = Math.max(0, 1.1+evKw-f.solar);
+      cost += net*(step/60)*f.price;
+    }
+  }
+  return {feasible, violations, cost: +cost.toFixed(2), evTarget: state.ev.target, schedule: evKwSlots};
+}
+
+function agentCycle(trigger, isConditionChange){
+  const dotEl = document.getElementById('agentDot');
+  dotEl.classList.add('thinking');
+  setTimeout(()=>dotEl.classList.remove('thinking'), 550);
+
+  const previousPlan = state.plan; // plan as it stood before this cycle
+
+  log(`Event: ${trigger}`, 'event');
+  log('Evaluated current household plan.', 'reason');
+  const opt = runOptimizer();
+  log('Called optimization engine.', 'reason');
+
+  if(!opt.feasible){
+    state.escalation = {
+      reason: opt.violations.join(' '),
+      cost: 4.20,
+    };
+    log(`Objective at risk: ${opt.violations[0]}`, 'warn');
+    log('Escalated decision to user.', 'warn');
+    state.replanEvent = null; // no clean replacement plan to show — see Needs You instead
+  } else {
+    state.escalation = null;
+    state.plan = opt;
+    log(`New plan generated. Expected cost $${opt.cost.toFixed(2)}. EV on track for ${opt.evTarget}% by deadline.`, 'ok');
+    log('Verified household state. Objective remains satisfied.', 'ok');
+
+    // Section 35 — Plan Replacement Visual: only surface when an actual
+    // condition change (not a routine scheduled tick) triggered a new plan.
+    if(isConditionChange && previousPlan && previousPlan.feasible){
+      state.replanEvent = {
+        cause: trigger,
+        previous: previousPlan,
+        next: opt,
+        savings: +(previousPlan.cost - opt.cost).toFixed(2),
+      };
+    } else if(isConditionChange){
+      state.replanEvent = null;
+    }
+  }
+  render();
+}
+
+function advance(minutes){
+  // apply first scheduled EV slot near-term if plan exists & feasible
+  if(state.plan && state.plan.feasible && state.plan.schedule.length){
+    const kw = state.plan.schedule[0].kw;
+    const deltaPct = state.ev.chargerOnline ? (kw*(minutes/60)/state.ev.capacity*100) : 0;
+    state.ev.soc = Math.min(100, state.ev.soc + deltaPct);
+  }
+  state.minutesElapsed += minutes;
+  agentCycle('scheduled reassessment');
+}
+
+function eventPriceSpike(){
+  const mod = minuteOfDay(now());
+  state.priceSchedule[Math.floor((mod/60)%24)] = 0.47;
+  agentCycle('electricity price spike ($0.18 → $0.47/kWh)', true);
+}
+function eventSolarDrop(){
+  state.solar.cloudFactor = 0.4;
+  agentCycle('solar forecast collapsed (2.8kW → 1.2kW)', true);
+}
+function eventDeadlineChange(){
+  state.ev.deadlineMin = state.minutesElapsed + 120;
+  agentCycle('EV departure moved earlier', true);
+}
+function eventDeviceFailure(){
+  state.ev.chargerOnline = false;
+  agentCycle('EV charger went offline', true);
+}
+function resolveEscalation(allowBackup){
+  if(allowBackup){
+    state.ev.chargerOnline = true;
+    log('User allowed backup charging option (+$4.20 estimated).', 'ok');
+  } else {
+    log('User chose to keep current plan; EV target may be missed.', 'warn');
+  }
+  state.escalation = null;
+  agentCycle('user decision received');
+}
+
+function fmtTime(d){ return d.toLocaleString('en-US',{weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}); }
+
+function render(){
+  const t = now();
+  const mod = minuteOfDay(t);
+  const solarKw = solarAt(mod, state.solar.cloudFactor);
+  const price = priceAt(mod);
+
+  document.getElementById('simTime').textContent = fmtTime(t);
+  document.getElementById('agentStatus').textContent = state.escalation ? 'NEEDS DECISION' : 'AUTONOMOUS';
+
+  const evOnTrack = state.ev.soc >= state.ev.target - 2 || (state.plan && state.plan.feasible);
+  document.getElementById('statusRow').innerHTML = `
+    <div class="stat ${evOnTrack && !state.escalation ? 'tracking':'risk'}">
+      <div class="stat-label">EV</div>
+      <div class="stat-value">${state.ev.soc.toFixed(0)}% → ${state.ev.target}%</div>
+      <div class="stat-sub">${state.escalation ? 'At risk' : 'On track'} <span class="badge ${state.escalation?'warn':'ok'}">${state.escalation?'⚠':'✓'}</span></div>
+    </div>
+    <div class="stat tracking">
+      <div class="stat-label">Battery</div>
+      <div class="stat-value">${state.battery.soc.toFixed(0)}%</div>
+      <div class="stat-sub">Reserve ${state.battery.reserve}% <span class="badge ok">✓</span></div>
+    </div>
+    <div class="stat tracking">
+      <div class="stat-label">Energy cost today</div>
+      <div class="stat-value">$${(state.plan?.cost ?? 0).toFixed(2)}</div>
+      <div class="stat-sub">Solar ${solarKw.toFixed(1)} kW · $${price.toFixed(2)}/kWh</div>
+    </div>`;
+
+  const evCharging = state.plan && state.plan.feasible && state.plan.schedule.length>0 && !state.escalation;
+  const solarToHouse = solarKw>0.1;
+  document.getElementById('flowRow').innerHTML = `
+    <div class="node"><div class="node-icon ${solarToHouse?'active':''}">☀</div><div class="node-label">Solar</div><div class="node-value">${solarKw.toFixed(1)} kW</div></div>
+    <div class="arrow ${solarToHouse?'on':''}"></div>
+    <div class="node"><div class="node-icon active">⌂</div><div class="node-label">House</div><div class="node-value">1.7 kW</div></div>
+    <div class="arrow ${evCharging?'on':''}"></div>
+    <div class="node"><div class="node-icon ${state.battery.soc>state.battery.reserve?'active':''}">⚡</div><div class="node-label">Battery</div><div class="node-value">${state.battery.soc.toFixed(0)}%</div></div>
+    <div class="arrow ${evCharging?'on':''}"></div>
+    <div class="node"><div class="node-icon ${evCharging?'active':''}">🚗</div><div class="node-label">EV</div><div class="node-value">${state.ev.soc.toFixed(0)}%</div></div>`;
+
+  document.getElementById('strategyList').innerHTML = `
+    <div class="strategy-item"><span class="k">EV charging</span><span class="v">${!state.ev.chargerOnline ? 'Charger offline' : state.escalation ? 'Awaiting decision' : evCharging ? 'Scheduled in cheapest/solar window' : 'Target reached'}</span></div>
+    <div class="strategy-item"><span class="k">Battery</span><span class="v">${state.battery.soc>state.battery.reserve+5 && price>0.28 ? 'Supporting household load' : 'Holding / charging from solar'}</span></div>
+    <div class="strategy-item"><span class="k">Flexible appliances</span><span class="v">Waiting for solar surplus or low price</span></div>`;
+
+  document.getElementById('timeline').innerHTML = state.plan && state.plan.feasible ? `
+    <div class="tl-item now"><div class="tl-time">Now — ${fmtTime(t)}</div><div class="tl-text">EV: ${state.ev.soc.toFixed(0)}%, charging ${evCharging?'active':'paused'}</div></div>
+    <div class="tl-item"><div class="tl-time">Deadline</div><div class="tl-text">EV target ${state.ev.target}% expected: ✓ on track</div></div>
+    <div class="tl-item"><div class="tl-time">Ongoing</div><div class="tl-text">Battery reserve protected at ${state.battery.reserve}%</div></div>` :
+    `<div class="tl-item now"><div class="tl-time">Now</div><div class="tl-text">Plan invalid — see Needs You</div></div>`;
+
+  document.getElementById('activityLog').innerHTML = state.activity.map(a=>`
+    <div class="act-item ${a.tag}"><span class="act-time">${a.t.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false})}</span><span class="act-text">${a.text}</span></div>`).join('');
+
+  const replanCard = document.getElementById('replanCard');
+  if(state.replanEvent){
+    replanCard.style.display = 'block';
+    document.getElementById('replanCause').textContent = `⚠ Conditions changed — ${state.replanEvent.cause}. VOLT replanned.`;
+    const prevSlots = state.replanEvent.previous.schedule.length;
+    const nextSlots = state.replanEvent.next.schedule.length;
+    document.getElementById('replanPrev').innerHTML = `
+      <div class="replan-row"><span class="k">EV charge slots</span><span class="v">${prevSlots}</span></div>
+      <div class="replan-row"><span class="k">Expected cost</span><span class="v">$${state.replanEvent.previous.cost.toFixed(2)}</span></div>
+      <div class="replan-row"><span class="k">EV target</span><span class="v">${state.replanEvent.previous.evTarget}%</span></div>`;
+    document.getElementById('replanNew').innerHTML = `
+      <div class="replan-row"><span class="k">EV charge slots</span><span class="v">${nextSlots}</span></div>
+      <div class="replan-row"><span class="k">Expected cost</span><span class="v">$${state.replanEvent.next.cost.toFixed(2)}</span></div>
+      <div class="replan-row"><span class="k">EV target</span><span class="v">${state.replanEvent.next.evTarget}%</span></div>`;
+    const savings = state.replanEvent.savings;
+    const savingsText = savings > 0 ? `Expected savings: $${savings.toFixed(2)}` : savings < 0 ? `Additional expected cost: $${Math.abs(savings).toFixed(2)}` : `Cost unchanged`;
+    document.getElementById('replanOutcome').textContent = `${savingsText} · Target: still achieved ✓`;
+  } else {
+    replanCard.style.display = 'none';
+  }
+
+  const needsYouCard = document.getElementById('needsYouCard');
+  if(state.escalation){
+    needsYouCard.style.display = 'block';
+    document.getElementById('needsYouText').textContent =
+      `${state.escalation.reason} Backup option available at an estimated additional cost of $${state.escalation.cost.toFixed(2)}.`;
+  } else {
+    needsYouCard.style.display = 'none';
+  }
+}
+
+agentCycle('initial plan generation');
+</script>
+</body>
+</html>
