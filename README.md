@@ -2,7 +2,7 @@
 
 AWS Agents for Humans Hackathon 2026
 
-**Live interactive demo:** *(add your Vercel URL here once deployed)* — also
+**Live interactive demo:**  — also
 available as a standalone repo at
 https://github.com/Abdullah49645/volt-demo if you just
 want the UI without the full backend.
